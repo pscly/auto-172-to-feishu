@@ -1,6 +1,3 @@
-# https://mcne840229gb.feishu.cn/base/CrxTb4kzgazMEasEoM0cAcGvnff?table=tblPP8l0hkymTKz8&view=vew5PB3NLP
-
-
 import json
 import time
 import os
@@ -99,7 +96,6 @@ class FsApi:
         return  1
 
 
-    
 
     # SDK 使用说明: https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/server-side-sdk/python--sdk/preparations-before-development
     # 以下示例代码默认根据文档示例值填充，如果存在代码问题，请在 API 调试台填上相关必要参数后再复制代码使用

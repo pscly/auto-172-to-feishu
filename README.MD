@@ -14,4 +14,16 @@
 
 获取数据的时候需要补充 web_code.py 方法里面 get_all_webdata 的参数 (Authorization, cid) (去手机端抓包)
 
+## 运行
 
+> 2025-08-25 14:13:46
+
+此项目 目前使用uv进行管理，
+
+可以用下面的命令同步环境和运行代码
+
+`bash
+uv sync
+uv run main.py
+
+```

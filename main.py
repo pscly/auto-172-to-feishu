@@ -15,7 +15,7 @@ if __name__ == '__main__':
 
     fs = FsApi()
     table_id = fs.add_data_table()
-    print('table_id',table_id)
+    print('table_id是：',table_id)
     if not fs.insert_any_data(ka.all_ka, table_id):
         for  ka in ka.all_ka:
             fs.insert_any_data(ka, table_id)
