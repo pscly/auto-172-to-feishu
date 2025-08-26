@@ -25,7 +25,6 @@
 ```bash
 uv sync
 uv run main.py
-
 ```
 
 ## 项目架构
@@ -85,3 +84,34 @@ graph TD
 2. 创建 AllKa 实例，调用 get_all_ka() 方法获取所有卡数据
 3. 创建 FsApi 实例，调用 add_data_table() 方法创建新的数据表
 4. 尝试将所有卡数据一次性插入表中，如果失败则逐个插入
+
+## 环境变量（重要）
+
+本项目依赖若干环境变量，请参考下面说明并在本地创建 `.env` （或者将 `.env.example` 复制为 `.env` 并填写）：
+注意：仓库中已将 `.env` 列入 `.gitignore`，请勿将包含敏感信息的 `.env` 推送到远程仓库。
+
+重要变量列表：
+- `FS_app_token`：飞书多维表的 app_token（必填）。用于调用飞书 bitable API。
+- `FS_APP_ID` / `FS_APP_SECRET`：飞书应用的 App ID 与 App Secret（必填）。
+- `FS_Authorization`：可选的飞书授权头（当需要使用 bearer token 时）。
+- `AUTHORIZATION`：目标 API 的 Authorization 请求头（通常为 "Bearer <token>"，从客户端抓包获取）。
+- `CID`：请求头中的 cid（可选，部分接口需要）。
+- `ZKL`：折扣率，控制返现金额的计算，默认建议 0.9（示例：0.9 表示你得到 90%）。
+- `PRODUCTS_API_URL`：产品列表的 API 地址，默认值已在 `.env.example` 中提供；当上游接口地址变化时可在此覆盖。
+- `172_index_url`：店铺/商品页面 URL（仅作参考，不一定在代码中使用）。
+
+示例（将 `.env.example` 复制为 `.env` 后填写真实值）：
+```bash
+cp .env.example .env
+# 编辑 .env 填写真实 token、cid 等
+```
+
+抓包说明（获取 `AUTHORIZATION` / `CID`）：
+1. 在手机上安装抓包工具（如 Charles、Fiddler 或使用带代理功能的抓包 App）。
+2. 在目标 APP 中完成一次访问（打开商品列表），在抓包记录中找到请求的 Authorization 与 cid。
+3. 将抓到的完整 Authorization（包含 "Bearer " 前缀）和 cid 填入 `.env`。
+
+安全提示：
+- 永远不要把 `.env` 上传到公共仓库。
+- 如果凭证泄露，请尽快在对应服务中重置/撤销。
+

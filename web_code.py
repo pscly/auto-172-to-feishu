@@ -110,18 +110,21 @@ class AllKa:
         self.get_all_ka()
 
     def get_all_webdata(self):
-        url = "https://172appapi.lot-ml.com/api/Products/NewQuery2?TimeType=0&page=1&OnShop=true&limit=199&IsKuan=0"
+        # 优先从环境变量读取 API URL，便于在不同环境下替换
+        url = os.getenv(
+            "PRODUCTS_API_URL",
+            "https://172appapi.lot-ml.com/api/Products/NewQuery2?TimeType=0&page=1&OnShop=true&limit=199&IsKuan=0",
+        )
         headers = {
             "User-Agent": "Mozilla/5.0 (Linux; Android 14; 2304FPN6DC Build/UKQ1.230804.001; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/138.0.7204.168 Mobile Safari/537.36 uni-app Html5Plus/1.0 (Immersed/35.142857)",
             "Connection": "Keep-Alive",
             "Accept-Encoding": "gzip",
-            # 'Authorization': "Bearer ",
-            'Authorization': os.getenv("AUTHORIZATION"),
-            # 'Authorization': "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJFbXBJZCI6IjAiLCJFbXBSb2xlIjoiIiwiQWdlbnRJRCI6IjY3ODkwOSIsImxvZ2luTmFtZSI6IumZiOWKm-a6kCIsIlVzZXJOYW1lIjoicHNjbHkiLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL3dzLzIwMDgvMDYvaWRlbnRpdHkvY2xhaW1zL3JvbGUiOiI2Nzg5MDkiLCJuYmYiOjE3NTUzMjgyODYsImV4cCI6MTc1NTkzMzA4NiwiaXNzIjoiWlNTb2Z0LkRhVGllLlVuaUFwaSIsImF1ZCI6IlpTU29mdC5EYVRpZS5VbmlBcGkifQ.nMcPYVNK02nRkammj_BDMoNfN2e_dHHQO--hKAPuneg",
-            "market": "xiaomi",
-            "ver": "341",
-            "platform": "android_app",
-            # 'cid': ""
+            # Authorization 从环境读取，确保敏感信息不写死在代码里
+            "Authorization": os.getenv("AUTHORIZATION"),
+            "market": os.getenv("MARKET", "xiaomi"),
+            "ver": os.getenv("APP_VER", "341"),
+            "platform": os.getenv("PLATFORM", "android_app"),
+            # 可选：CID 同样从环境读取，以便不同设备/环境复用
             "cid": os.getenv("CID"),
         }
         response = requests.get(url, headers=headers)
