@@ -109,29 +109,167 @@ class AllKa:
         self.wb = WebClient()
         self.get_all_ka()
 
+    def ensure_logged_in(self):
+        """
+        每次查询前调用：
+        - 如果设置了 PASSWORD 则优先用密码登录并返回 'password'（登录成功）
+        - 否则如果有 AUTHORIZATION/CID 则使用它们设置到 headers 并返回 'env'
+        - 否则返回 None 表示没有可用凭据
+        """
+        password = os.getenv("PASSWORD")
+        username = os.getenv("USERNAME", "pscly")
+        cid = os.getenv("CID")
+        auth_env = os.getenv("AUTHORIZATION")
+        
+        if password:
+            token = self.login_with_password(username, password, cid)
+            if token:
+                # 使用密码登录成功
+                self.wb.headers["Authorization"] = f"Bearer {token}"
+                if cid:
+                    self.wb.headers["cid"] = cid
+                return "password"
+            else:
+                print("密码登录失败，尝试使用 AUTHORIZATION + CID 作为回退")
+
+        if auth_env and cid:
+            # 使用环境中的 AUTHORIZATION + CID
+            self.wb.headers["Authorization"] = auth_env
+            self.wb.headers["cid"] = cid
+            return "env"
+
+        if auth_env and not cid:
+            # 兼容只有 AUTHORIZATION 的情况
+            self.wb.headers["Authorization"] = auth_env
+            return "env"
+
+        print("没有可用的登录凭据（PASSWORD 或 AUTHORIZATION+CID），请求可能会失败")
+        return None
+
+    def login_with_password(self, username, password, cid):
+        """
+        使用用户名+密码登录，返回 token 字符串（如果有）。
+        登录接口和请求头尽量与示例匹配，并支持从环境变量覆盖 URL。
+        """
+        url = os.getenv("LOGIN_URL", "https://172appapi.lot-ml.com/api/User/Login")
+        payload = {
+            "userName": username,
+            "password": password,
+            "type": 0,
+            "system": "Android",
+            "cid": cid,
+        }
+        headers = {
+            "User-Agent": self.wb.headers.get("User-Agent", "python-requests/unknown"),
+            "Connection": "Keep-Alive",
+            "Accept-Encoding": "gzip",
+            "Content-Type": "application/json",
+            "market": os.getenv("MARKET", "xiaomi"),
+            "ver": os.getenv("APP_VER", "341"),
+            "platform": os.getenv("PLATFORM", "android_app"),
+        }
+        if cid:
+            headers["cid"] = cid
+
+        try:
+            resp = requests.post(url, data=json.dumps(payload), headers=headers, timeout=10)
+            if resp.status_code == 200:
+                j = resp.json()
+                # 常见的返回结构：{"data": {"token": "xxx", ...}, ...} 或直接 {"token": "xxx"}
+                token = None
+                if isinstance(j, dict):
+                    data = j.get("data") or j
+                    if isinstance(data, dict):
+                        token = data.get("token") or data.get("access_token") or data.get("authorization") or data.get("auth")
+                if token:
+                    return token
+                else:
+                    print("登录返回但未找到 token 字段，返回内容：", j)
+            else:
+                print(f"登录失败，状态码：{resp.status_code}, 内容：{resp.text}")
+        except Exception as e:
+            print("登录请求异常：", e)
+        return None
+
     def get_all_webdata(self):
         # 优先从环境变量读取 API URL，便于在不同环境下替换
         url = os.getenv(
             "PRODUCTS_API_URL",
             "https://172appapi.lot-ml.com/api/Products/NewQuery2?TimeType=0&page=1&OnShop=true&limit=199&IsKuan=0",
         )
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Linux; Android 14; 2304FPN6DC Build/UKQ1.230804.001; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/138.0.7204.168 Mobile Safari/537.36 uni-app Html5Plus/1.0 (Immersed/35.142857)",
+
+        # 确保在每次查询前完成登录逻辑（如果配置了）
+        mode = self.ensure_logged_in()
+
+        # 基于 WebClient 的 headers 构造请求头，兼容之前的配置
+        headers = dict(self.wb.headers or {})
+        headers.update({
             "Connection": "Keep-Alive",
             "Accept-Encoding": "gzip",
-            # Authorization 从环境读取，确保敏感信息不写死在代码里
-            "Authorization": os.getenv("AUTHORIZATION"),
             "market": os.getenv("MARKET", "xiaomi"),
             "ver": os.getenv("APP_VER", "341"),
             "platform": os.getenv("PLATFORM", "android_app"),
-            # 可选：CID 同样从环境读取，以便不同设备/环境复用
-            "cid": os.getenv("CID"),
-        }
-        response = requests.get(url, headers=headers)
-        if response.status_code == 401:
-            print("请求失败")
-            print("去检查一下 Cookies 相关吧")
+        })
+
+        # 如果环境中有 CID，优先确保它在 headers 中
+        cid_env = os.getenv("CID")
+        if cid_env:
+            headers["cid"] = cid_env
+
+        # 发起请求（第一次）
+        try:
+            response = requests.get(url, headers=headers, timeout=10)
+        except Exception as e:
+            print("请求异常：", e)
             quit()
+
+        # 如果第一次使用 env 凭据返回 401，则尝试使用账号密码登录并重试一次
+        if response.status_code == 401:
+            if mode == "env":
+                print("凭据可能已过期（AUTHORIZATION+CID 返回401），尝试使用账号密码登录并重试一次")
+                username = os.getenv("USERNAME", "pscly")
+                password = os.getenv("PASSWORD")
+                if not password:
+                    print("没有配置 PASSWORD，无法使用账号密码登录回退")
+                    quit()
+
+                token = self.login_with_password(username, password, cid_env)
+                if not token:
+                    print("使用账号密码登录失败，无法继续请求")
+                    quit()
+
+                # 设置新的 token 到 headers 并重试
+                self.wb.headers["Authorization"] = f"Bearer {token}"
+                if cid_env:
+                    self.wb.headers["cid"] = cid_env
+
+                headers = dict(self.wb.headers or {})
+                headers.update({
+                    "Connection": "Keep-Alive",
+                    "Accept-Encoding": "gzip",
+                    "market": os.getenv("MARKET", "xiaomi"),
+                    "ver": os.getenv("APP_VER", "341"),
+                    "platform": os.getenv("PLATFORM", "android_app"),
+                })
+                if cid_env:
+                    headers["cid"] = cid_env
+
+                try:
+                    response = requests.get(url, headers=headers, timeout=10)
+                except Exception as e:
+                    print("重试请求异常：", e)
+                    quit()
+
+                if response.status_code == 200:
+                    return response.json()
+                else:
+                    print("重试后请求失败, 状态码:", response.status_code)
+                    quit()
+            else:
+                print("请求失败: 401 Unauthorized")
+                print("去检查一下 Cookies 或者登录相关吧")
+                quit()
+
         if response.status_code == 200:
             return response.json()
         else:
